@@ -12,6 +12,8 @@
 ;; Constants
 (define-constant contract-owner tx-sender)
 (define-constant err-owner-only (err u100))
+(define-constant err-quest-not-found (err u101))
+(define-constant err-level-too-low (err u102))
 
 ;; Create new quest
 (define-public (create-quest (id uint) (name (string-ascii 24)) (reward-xp uint) (min-level uint))
@@ -26,7 +28,8 @@
 ;; Complete quest
 (define-public (complete-quest (quest-id uint))
   (let (
-    (quest (unwrap! (map-get? quests quest-id) (err u101)))
-    (character contract-call? .character get-character))
-    ;; Implementation for quest completion
-    (ok true)))
+    (quest (unwrap! (map-get? quests quest-id) err-quest-not-found))
+    (character (unwrap! (contract-call? .character get-character) (err u103)))
+  )
+    (asserts! (>= (get level character) (get min-level quest)) err-level-too-low)
+    (contract-call? .character add-experience (get reward-xp quest))))
