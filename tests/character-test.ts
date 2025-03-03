@@ -27,7 +27,50 @@ Clarinet.test({
       deployer.address
     );
     
-    // Should be level 2 after gaining 150 experience
     assertEquals(character.result, '(ok {name: "Hero", level: u2, experience: u150})');
+  },
+});
+
+Clarinet.test({
+  name: "Ensure invalid name is rejected",
+  async fn(chain: Chain, accounts: Map<string, Account>) {
+    const deployer = accounts.get("deployer")!;
+    
+    let block = chain.mineBlock([
+      Tx.contractCall("character", "create-character", 
+        [""], 
+        deployer.address
+      )
+    ]);
+    
+    assertEquals(block.receipts[0].result, "(err u102)");
+  },
+});
+
+Clarinet.test({
+  name: "Ensure level is capped at maximum",
+  async fn(chain: Chain, accounts: Map<string, Account>) {
+    const deployer = accounts.get("deployer")!;
+    
+    let block = chain.mineBlock([
+      Tx.contractCall("character", "create-character", 
+        ["Hero"], 
+        deployer.address
+      ),
+      Tx.contractCall("character", "add-experience",
+        [types.uint(10000)],
+        deployer.address
+      )
+    ]);
+    
+    let character = chain.callReadOnlyFn(
+      "character",
+      "get-character",
+      [],
+      deployer.address
+    );
+    
+    // Should be capped at MAX-LEVEL (u100)
+    assertEquals(character.result.includes("level: u100"), true);
   },
 });
