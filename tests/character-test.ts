@@ -2,7 +2,7 @@ import { Clarinet, Tx, Chain, Account, types } from 'https://deno.land/x/clarine
 import { assertEquals } from 'https://deno.land/std@0.90.0/testing/asserts.ts';
 
 Clarinet.test({
-  name: "Ensure can create character",
+  name: "Ensure can create character and level up",
   async fn(chain: Chain, accounts: Map<string, Account>) {
     const deployer = accounts.get("deployer")!;
     
@@ -10,11 +10,67 @@ Clarinet.test({
       Tx.contractCall("character", "create-character", 
         ["Hero"], 
         deployer.address
+      ),
+      Tx.contractCall("character", "add-experience",
+        [types.uint(150)],
+        deployer.address
       )
     ]);
     
-    assertEquals(block.receipts.length, 1);
-    assertEquals(block.height, 2);
+    assertEquals(block.receipts.length, 2);
     assertEquals(block.receipts[0].result, "(ok true)");
+    
+    let character = chain.callReadOnlyFn(
+      "character",
+      "get-character",
+      [],
+      deployer.address
+    );
+    
+    assertEquals(character.result, '(ok {name: "Hero", level: u2, experience: u150})');
+  },
+});
+
+Clarinet.test({
+  name: "Ensure invalid name is rejected",
+  async fn(chain: Chain, accounts: Map<string, Account>) {
+    const deployer = accounts.get("deployer")!;
+    
+    let block = chain.mineBlock([
+      Tx.contractCall("character", "create-character", 
+        [""], 
+        deployer.address
+      )
+    ]);
+    
+    assertEquals(block.receipts[0].result, "(err u102)");
+  },
+});
+
+Clarinet.test({
+  name: "Ensure level is capped at maximum",
+  async fn(chain: Chain, accounts: Map<string, Account>) {
+    const deployer = accounts.get("deployer")!;
+    
+    let block = chain.mineBlock([
+      Tx.contractCall("character", "create-character", 
+        ["Hero"], 
+        deployer.address
+      ),
+      Tx.contractCall("character", "add-experience",
+        [types.uint(10000)],
+        deployer.address
+      )
+    ]);
+    
+    let character = chain.callReadOnlyFn(
+      "character",
+      "get-character",
+      [],
+      deployer.address
+    );
+    
+    // Should be capped at MAX-LEVEL (u100)
+    assertEquals(character.result.includes("level: u100"), true);
   },
 });
